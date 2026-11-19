@@ -183,6 +183,22 @@ This installs the native Antigravity plugin bundle (`skills`, `agents`, and `Ses
 
 </details>
 
+<a id="deepseek-harness"></a>
+<details>
+<summary><strong>DeepSeek Harness</strong></summary>
+
+Install the native bundle from a local checkout:
+
+```shell
+dsh plugin --profile web add /absolute/path/to/pstack-claude
+```
+
+`dsh plugin add` installs the package and appends `pstack` to the profile's `dsh.profile.bundles`. Restart the profile. The bundle registers every skill under `plugins/pstack/skills/` and injects the pstack routing and the `${DSH_HOME:-~/.dsh}/pstack-models.md` role lines into root sessions. It also adds a `pstack` agent preset and a `pstack_subagent` delegation tool. Select `pstack` in the preset menu before starting a session to let the built-in `subagent` take `agent_preset: pstack`; from any other preset, call `pstack_subagent` for a pstack child. The `pstack` preset is tuned for delegated work: it carries the file, shell, skill, todo, web, question, job, delegation, and compaction rows, but not Standard's plan mode, goals, schedule, workflow, or plugin-manager rows. It needs no skill symlinks and no `AGENTS.md` edit. Check the composed row with `dsh --profile web --dump-config | grep pstack-dsh`, or type `/` in a session to see the skills. Use `--profile tui` for the TUI profile, or `github:jackie1in/pstack-claude` in place of the local path after this change is published.
+
+To update a linked checkout, run `git pull` and restart the profile; the bundle registers the current skill tree at boot. A skills-only install still works when the bundle cannot be installed: use the shared loop under [Other harnesses](#other-harnesses) and skip `dsh plugin add`. Do not do both in one profile.
+
+</details>
+
 <a id="other-harnesses"></a>
 <details>
 <summary><strong>Other harnesses</strong></summary>
@@ -205,7 +221,7 @@ To update, run `git pull` in the clone, then run the `for` loop again to link sk
 
 ### Configure
 
-pstack provides automatic routing on Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, Antigravity, Pi, Kimi Code CLI, OMP, and OpenCode 2. The runtimes deliver the instruction at different points: Kimi adds it while the plugin is enabled, OMP adds it before each main-agent turn, and OpenCode adds it at each model step in root sessions. Grok Build exposes a routing hint through a skill description; the model may not follow it. Codex requires hook trust through `/hooks`, and Muse requires `muse plugins approve pstack`. Other harnesses have no automatic routing.
+pstack provides automatic routing on Claude Code, Codex, GitHub Copilot, Muse, MiniMax Code, Antigravity, Pi, Kimi Code CLI, OMP, OpenCode 2, and the DeepSeek Harness bundle. The runtimes deliver the instruction at different points: Kimi adds it while the plugin is enabled, OMP adds it before each main-agent turn, OpenCode adds it at each model step in root sessions, and the DSH bundle adds it at root-session prompt assembly. Grok Build exposes a routing hint through a skill description; the model may not follow it. Codex requires hook trust through `/hooks`, and Muse requires `muse plugins approve pstack`. Other harnesses have no automatic routing.
 
 Run `setup-pstack` to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`). On OMP, the session hook setting applies globally across profiles; on Kimi, enable or disable the plugin to control routing. See the [routing reference](docs/reference.md#automatic-routing).
 

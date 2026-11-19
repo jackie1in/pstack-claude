@@ -5,16 +5,16 @@
 // nothing and fails when a committed copy is stale, so it cannot ship.
 //
 // Sources of truth:
-//   VERSION  -> the "version" field in the Claude Code manifests and each RUNTIMES row's manifest
+//   VERSION  -> the "version" field in the Claude Code manifests and each native-manifest RUNTIMES row's manifest
 //   CHANGES.md must carry a heading for the current VERSION (release completeness)
 //   each skill's frontmatter (name + description) defines the shared Agent
-//   Skills boundary consumed natively by Codex, Prime, opencode, and Gemini CLI
+//   Skills boundary consumed natively by Codex, Prime, opencode, Gemini CLI, and DeepSeek Harness
 //   plugins/pstack/models.json (the model policy: role defaults, diverse panel,
-//   available slugs, and one block per RUNTIMES row: Codex equivalents, Pi IDs)
+//   available slugs, and one block per runtime that ships model defaults: Codex, Pi, Muse)
 //     -> each model-consuming skill's "## Models" and "## Reasoning effort" sections
 //     -> setup-pstack's Models section and override-sheet block
 //     -> the "## Model names" section of each runtime's mapping file
-//        (poteto-mode/references/codex-tools.md, pi-tools.md, copilot-tools.md)
+//        (each runtime mapping under poteto-mode/references/)
 //   the Per-skill notes table in poteto-mode/references/codex-tools.md
 //     -> the Codex preamble under the first heading of each listed skill's SKILL.md
 //   the Per-skill notes table in poteto-mode/references/copilot-tools.md
@@ -29,7 +29,7 @@
 //   No other model name (a claude-* ID or a backticked family name) may appear
 //   in skill prose; the scan below fails on strays.
 //
-// Also validated: each RUNTIMES row's packaging, through the row's `validate`
+// Also validated: each native-manifest RUNTIMES row's packaging, through its `validate`
 // (tools/runtimes.mjs), and every hooks file, the Claude Code plugin's and the
 // ones each row's manifest names. docs/reference.md's "Slash commands" table
 // must hold one row per public skill (every Agent Skill not marked
@@ -63,7 +63,7 @@ const repoRelative = (root, file) => relative(root, file).split(sep).join("/");
 const VERSIONED_MANIFESTS = [
   ".claude-plugin/marketplace.json",
   `${PLUGIN}/.claude-plugin/plugin.json`,
-  ...RUNTIMES.map((runtime) => runtime.manifest),
+  ...RUNTIMES.filter((runtime) => runtime.manifest).map((runtime) => runtime.manifest),
 ];
 
 export const PORTABLE_ASSETS = [
@@ -968,7 +968,7 @@ export function problems(root, models) {
   const skillsDir = join(root, SKILLS);
   const read = (rel) => readFileSync(join(root, rel), "utf8");
   const pathExists = (rel) => existsSync(join(root, rel));
-  const packages = RUNTIMES.map((runtime) =>
+  const packages = RUNTIMES.filter((runtime) => runtime.manifest).map((runtime) =>
     attempt(() => {
       const text = read(runtime.manifest);
       let manifest;

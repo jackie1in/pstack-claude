@@ -17,6 +17,7 @@ The role lines are the same everywhere. What differs is the sheet path, how the 
 | OMP | `~/.omp/pstack-models.md` (global across profiles; hook only) | read by the OMP plugin for routing | `omp models --kind chat`; model roles use OMP configuration, see [omp-tools.md](../../poteto-mode/references/omp-tools.md#model-names) | installation, skill access, and the routing toggle checked on OMP 18.16.0 with a synthetic provider; model compliance untested |
 | Grok Build | `${GROK_HOME:-~/.grok}/pstack-models.md` | read by the agent before a role-model skill; the `session hook` line does not control the Grok routing hint | the `spawn_subagent` tool's advertised models; use overrides only at the user's explicit request; see [grok.md](../../poteto-mode/references/grok.md#model-names) | synthetic-provider plugin and skill loading tested |
 | OpenCode 2 | `${XDG_CONFIG_HOME:-~/.config}/opencode/pstack-models.md` | add the path to the `instructions` array in `opencode.jsonc`; the plugin reads the hook setting directly | the `models` command in the session; see [opencode-tools.md](../../poteto-mode/references/opencode-tools.md#model-names) | native skill activation and routing tested on 2.2.5 with a loopback provider |
+| DeepSeek Harness | `${DSH_HOME:-~/.dsh}/pstack-models.md` | the pstack DSH bundle reads it and injects its role lines into the session prompt | `list_subagent_models` when exposed, see [dsh-tools.md](../../poteto-mode/references/dsh-tools.md#model-names) | native bundle tested on 0.2.2-rc.1; no shell hook |
 | Gemini CLI | `~/.gemini/pstack-models.md` | `@~/.gemini/pstack-models.md` in `~/.gemini/GEMINI.md` | the `model` slash command in the session | from published docs, no live session |
 | Prime Agent | no documented sheet path; Prime's configuration chooses models | | | no live session |
 
@@ -65,6 +66,13 @@ Read the [platform mapping](../../poteto-mode/references/grok.md) first.
 - **Step 2 (load current state).** Preserve full `claude-` IDs and validate them against the tool's advertised models instead of rewriting them to family names.
 - **Steps 3, 4, and 5 (effort, session hook, validate).** Skip step 4, the effort questions in step 3, and effort validation in step 5. Omit effort and `session hook` lines and suffixes from the sheet. Grok exposes no per-call effort parameter.
 - **Step 8 (confirm).** Explain that the enabled plugin supplies a model-followed routing hint that the `session hook` setting does not control.
+
+## DeepSeek Harness
+
+- **Step 1 (detect models).** Use `list_subagent_models` when the session exposes it; otherwise use the deployment's model settings. Write each role as `provider/model`, never a Claude alias.
+- **Steps 3 and 5 (effort, validate).** `subagent` exposes `reasoning_effort` only when model selection is enabled. Ask for a level only when the chosen provider/model advertises it; otherwise omit the `@<level>` suffix.
+- **Step 4 (session hook).** The pstack DSH bundle injects the mandate and the sheet into the session prompt. A `session hook: off` line stops the mandate but keeps the role lines.
+- **Step 6 (write the sheet).** Write `${DSH_HOME:-~/.dsh}/pstack-models.md`; the bundle reads it at each assembly, so no include line and no restart are needed.
 
 ## OMP
 

@@ -1,0 +1,98 @@
+# The pstack bundle for DeepSeek Harness. `dsh plugin add` installs this
+# package and appends it to the profile's bundle list, so the shared skills and
+# the session-start routing section load without symlinks or a separate skill
+# tree.
+- insert:
+    - id: pstack-dsh
+      name: './plugins/pstack/dsh/index.mjs'
+
+    # A pstack-flavored child composition: the role prompt, the file, shell,
+    # skill, todo, web, question, job, and delegation tools, and compaction.
+    # Selecting it as a session preset also lets the built-in `subagent` take
+    # `agent_preset: pstack`, because its own row allows that one preset.
+    - id: preset-pstack
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: pstack
+        name: pstack
+        description: pstack subagent with the shared skills, file and shell tools, and one delegation level.
+        order: 50
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |
+                You are a pstack subagent. Before anything else, load the `poteto-mode` skill with the `skill` tool and read `worker.md` next to that skill. Follow the brief you were given; do not widen its scope.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+            config:
+              applyPatch: false
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: tool-web
+            name: '@deepseek-ai/dsh-tool-web'
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-subagent-control
+            name: '@deepseek-ai/dsh-tool-subagent-control'
+          - id: tool-subagent
+            name: '@deepseek-ai/dsh-tool-subagent'
+            config:
+              provider: spawn
+              toolName: subagent
+              agentPreset: pstack
+              allowedAgentPresets: [pstack]
+              modelSelection: true
+              modelDiscovery: true
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+
+    # A zero-config delegation tool: every child runs on the pstack preset, so
+    # a session whose own preset does not expose `agent_preset` can still
+    # dispatch a pstack role.
+    - id: pstack-subagent
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: spawn
+        toolName: pstack_subagent
+        agentPreset: pstack
+        modelSelection: true

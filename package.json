@@ -2,7 +2,7 @@
   "name": "pstack",
   "private": true,
   "version": "0.9.140",
-  "description": "If you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Pi and OpenCode package of the Claude Code plugin; skills are shared, and runtime mappings translate tool names. Original pstack by Lauren Tan (poteto).",
+  "description": "If you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence. Pi, OpenCode, and DeepSeek Harness package of the Claude Code plugin; skills are shared, and runtime mappings translate tool names. Original pstack by Lauren Tan (poteto).",
   "author": {
     "name": "Michael Denyer",
     "url": "https://github.com/michael-denyer"
@@ -39,6 +39,14 @@
   },
   "exports": {
     "./server": "./plugins/pstack/opencode/index.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.2-rc.1 <0.3.0"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

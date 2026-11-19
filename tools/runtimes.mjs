@@ -14,7 +14,9 @@ import { code, codeList, PLUGIN, SKILLS } from "./plugin.mjs";
 // none: its one pointer is in poteto-mode's Platform
 // Adaptation section. `manifest` is the file the generator stamps VERSION
 // into, `validate` checks the runtime's packaging against the tree once that
-// manifest parses, and `hooks` lists the hooks files the manifest names,
+// manifest parses. Skills-only rows omit `manifest` and `validate`; they still
+// participate in mapping generation and shared skill validation.
+// `hooks` lists the hooks files a native manifest names,
 // relative to the plugin root. GitHub Copilot stamps preambles but has no
 // models.json block, since it ships no default models.
 // Muse declares its hooks inline in its native manifest, so it has no hooks
@@ -110,6 +112,15 @@ export const RUNTIMES = [
     modelNames: grokModelNamesSection,
     manifest: `${PLUGIN}/.grok-plugin/plugin.json`,
     validate: ({ manifest, pathExists, agentSkills }) => validateGrokPlugin(manifest, { pathExists, agentSkills }),
+  },
+  {
+    name: "DeepSeek Harness",
+    mapping: "dsh-tools.md",
+    modelNames: dshModelNamesSection,
+    // The root package is the DSH bundle: its dsh.bundle.patch mounts the
+    // plugin that registers the shared skills and the routing section.
+    manifest: "package.json",
+    validate: ({ manifest, read, pathExists }) => validateDshPackage(manifest, { read, pathExists }),
   },
   {
     name: "OpenCode 2",
@@ -574,6 +585,45 @@ export function ompModelNamesSection() {
     "settings. Use only models listed by the active installation; do not copy Claude model aliases into OMP. " +
     "If the available agent roster cannot select distinct models for a requested panel, report that limitation."
   );
+}
+
+export function dshModelNamesSection(models) {
+  return (
+    "DSH selects providers, models, and reasoning efforts through its current deployment. " +
+    "Do not pass Claude Code model aliases to DSH or use the Pi/Copilot mapping merely because the parent model comes from that provider. " +
+    "Use `list_subagent_models` when exposed: first list providers, then models for a provider, then efforts for the exact provider/model pair. " +
+    "Without that tool, use the deployment's model settings or omit unsupported selectors. Pass `provider`, `model`, and " +
+    "`reasoning_effort` only when the live delegation schema accepts them; omit all selectors to use its documented defaults.\n\n" +
+    `Roles used by ${roleSkills(models).map(code).join(", ")} are prompt responsibilities, not DSH model IDs or built-in agent types. ` +
+    `Diverse-model panels (${panelSkills(models)}) require distinct available model families; report when that is unavailable. ` +
+    "Do not manufacture diversity by relabeling the same model.\n\n" +
+    "The bundle injects the role lines from `${DSH_HOME:-~/.dsh}/pstack-models.md` when that sheet exists; " +
+    "the lines are the user's saved choices, not resolved routes. `setup-pstack` writes them, `session hook: off` " +
+    "stops the routing mandate but keeps the role lines, and `inherit-parent` or `auto` omits `model` and `reasoning_effort`."
+  );
+}
+
+// The root package is the DSH bundle. Its patch mounts the plugin that
+// registers the shared skills, so the manifest, patch, plugin, and version
+// range must all agree before a `dsh plugin add` can load it.
+export function validateDshPackage(manifest, { read, pathExists }) {
+  const at = "package.json";
+  if (manifest.dsh?.bundle?.patch !== "./cordis.patch.yml") {
+    throw new Error(`${at}: dsh.bundle.patch must be ./cordis.patch.yml`);
+  }
+  if (!pathExists("cordis.patch.yml")) throw new Error(`${at}: dsh.bundle.patch names a file that does not exist`);
+  if (!pathExists("plugins/pstack/dsh/index.mjs")) throw new Error(`${at}: DSH bundle plugin plugins/pstack/dsh/index.mjs is missing`);
+  if (!pathExists("plugins/pstack/skills/poteto-mode/SKILL.md")) {
+    throw new Error(`${at}: DSH bundle plugin reads plugins/pstack/skills, which is missing`);
+  }
+  const range = manifest.engines?.dsh;
+  if (typeof range !== "string" || !range.includes("0.2.2-rc.1")) {
+    throw new Error(`${at}: engines.dsh must admit 0.2.2-rc.1`);
+  }
+  const patch = read("cordis.patch.yml");
+  for (const needle of ["id: pstack-dsh", "./plugins/pstack/dsh/index.mjs", "id: preset-pstack", "id: pstack-subagent"]) {
+    if (!patch.includes(needle)) throw new Error(`cordis.patch.yml: missing ${needle}`);
+  }
 }
 
 export function validateKimiManifest(manifest, { pathExists }) {
