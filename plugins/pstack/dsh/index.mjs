@@ -109,6 +109,25 @@ export function routingText() {
   return `${mandate}\n\n${note}`;
 }
 
+// dsh dropped `AgentRegistry.roots()` in 0.2.1-rc.3; the subagent service owns
+// runtime tree membership now. Both forms answer the same question: is the
+// initiator a top-level agent rather than a delegated child? An unmanaged or
+// stale instance throws instead, and there the routing mandate stays on.
+// Cordis throws on `ctx.subagents` here because this bundle never declared that
+// dependency; `ctx.get()` is the service read that skips the inject requirement.
+export function isRootInitiator(ctx, initiator) {
+  if (typeof ctx.agents.roots === "function") {
+    return ctx.agents.roots().some((root) => root.id === initiator.id);
+  }
+  const subagents = ctx.get("subagents");
+  if (typeof subagents?.rootOf !== "function") return true;
+  try {
+    return subagents.rootOf(initiator) === initiator;
+  } catch {
+    return true;
+  }
+}
+
 export function apply(ctx, config = {}) {
   for (const skill of loadBundledSkills(config.skillsDir ?? SKILLS_DIR)) {
     ctx.skills.register(skill);
@@ -123,7 +142,7 @@ export function apply(ctx, config = {}) {
     text: () => {
       if (hookOff(readModelSheet(config.home))) return "";
       const initiator = ctx.agents.currentInitiator();
-      if (initiator && !ctx.agents.roots().some((root) => root.id === initiator.id)) return "";
+      if (initiator && !isRootInitiator(ctx, initiator)) return "";
       return routing;
     },
   });

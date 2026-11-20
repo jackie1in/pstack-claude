@@ -34,16 +34,26 @@ mappingCoverage(runtime, [
   ["run_in_background", "`run_in_background`"],
 ]);
 
-function fakeContext({ initiator = { id: "root" }, roots = [{ id: "root" }], home } = {}) {
+// dsh 0.2.2-rc.5 dropped `AgentRegistry.roots()`; tree membership moved to the
+// subagent service, so the default fake matches that runtime and the legacy
+// registry shape is opt-in. Cordis throws when a plugin reads a service it did
+// not inject, so the fake throws on `ctx.subagents` exactly like the runtime and
+// answers service reads through `ctx.get()`.
+function fakeContext({ root = { id: "root" }, initiator = root, home, registry = {}, rootOf } = {}) {
   const skills = [];
   const sections = [];
+  const subagents = { rootOf: rootOf ?? ((agent) => (agent === root ? agent : root)) };
   return {
     skills,
     sections,
     ctx: {
       skills: { register: (skill) => { skills.push(skill); return () => {}; } },
       systemPrompt: { section: (section) => { sections.push(section); return () => {}; } },
-      agents: { currentInitiator: () => initiator, roots: () => roots },
+      agents: { currentInitiator: () => initiator, list: () => [root], ...registry },
+      get: (name) => (name === "subagents" ? subagents : undefined),
+      get subagents() {
+        throw new Error('cannot get property "subagents" without inject');
+      },
       home,
     },
   };
@@ -94,9 +104,36 @@ test("apply registers the catalog, the routing section, and the model sheet", ()
 });
 
 test("a subagent does not receive the routing mandate", () => {
-  const { ctx, sections } = fakeContext({ initiator: { id: "child" }, roots: [{ id: "root" }] });
+  const { ctx, sections } = fakeContext({ initiator: { id: "child" }, root: { id: "root" } });
   apply(ctx);
   expect(sections[0].text()).toBe("");
+});
+
+test("a registry that still has roots() answers root membership", () => {
+  const { ctx, sections } = fakeContext({
+    initiator: { id: "child" },
+    registry: { roots: () => [{ id: "root" }] },
+  });
+  apply(ctx);
+  expect(sections[0].text()).toBe("");
+});
+
+test("an unresolved tree root keeps the routing mandate", () => {
+  const { ctx, sections } = fakeContext({
+    initiator: { id: "child" },
+    rootOf: () => {
+      throw new Error("UNAUTHORIZED");
+    },
+  });
+  apply(ctx);
+  expect(sections[0].text()).not.toBe("");
+});
+
+test("a profile without a subagent service keeps the routing mandate", () => {
+  const { ctx, sections } = fakeContext({ initiator: { id: "child" } });
+  ctx.get = () => undefined;
+  apply(ctx);
+  expect(sections[0].text()).not.toBe("");
 });
 
 test("a missing model sheet contributes nothing", () => {
