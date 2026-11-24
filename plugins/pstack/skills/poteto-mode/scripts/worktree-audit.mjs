@@ -51,6 +51,17 @@ const GH_PR_LIST = ["pr", "list", "--author", "@me", "--state", "all", "--limit"
   "--json", "number,state,headRefName,headRefOid"];
 // An ignored path under one of these names is a rebuildable build or cache
 // artifact. Any other ignored path, such as `.env`, may exist nowhere else.
+//
+// A nested checkout under a Session's worktree pool is ignored by the pool's
+// own `.gitignore`, and the audit lists it as its own row. Counting it here
+// would flag every parent of a nested checkout as hold-ignored.
+// The pools DSH and Claude Code create checkouts in. A registered checkout
+// below either is audited as its own worktree.
+const inWorktreePool = (name) => {
+  const parts = name.split("/");
+  return parts.some((part, index) => part === "worktrees" && (parts[index - 1] === ".agents" || parts[index - 1] === ".claude"));
+};
+
 export const DISPOSABLE = new Set([
   ".build", ".cache", ".dart_tool", ".DS_Store", ".gradle", ".lake", ".lycheecache", ".mypy_cache", ".next", ".nuxt",
   ".parcel-cache", ".pytest_cache", ".ruff_cache", ".svelte-kit", ".tox", ".turbo", ".venv", "__pycache__", "build",
@@ -294,7 +305,8 @@ function dirtyState(path) {
     .split("\n").filter(Boolean);
   const untracked = lines.filter((line) => line.startsWith("??")).length;
   const ignoredLines = lines.filter((line) => line.startsWith("!!"));
-  const keepIgnored = (name) => !name.split("/").some((part) => DISPOSABLE.has(part));
+  const keepIgnored = (name) =>
+    !inWorktreePool(name) && !name.split("/").some((part) => DISPOSABLE.has(part));
   let ignored = ignoredLines.filter((line) => keepIgnored(line.slice(3).replace(/^"|"$/g, ""))).length;
   // Superproject status omits ignored files in initialized submodules, even with --ignore-submodules=none.
   if (statSync(join(path, ".gitmodules"), { throwIfNoEntry: false })) {

@@ -301,6 +301,25 @@ test("an ignored file outside build and cache directories holds the worktree, ig
   expect([row(deps)[3], row(deps)[7]]).toEqual(["clean", "safe"]);
 });
 
+test("a nested checkout in the worktree pool does not hold its parent, an ignored file beside it does", () => {
+  const fixture = createFixture();
+  writeFileSync(join(fixture.repo, ".git/info/exclude"), ".env\n");
+  const parent = addWorktree(fixture, "parent");
+  const pool = join(parent, ".agents", "worktrees");
+  mkdirSync(pool, { recursive: true });
+  writeFileSync(join(pool, ".gitignore"), "*\n");
+  git("-C", parent, "worktree", "add", ".agents/worktrees/child", "-b", "child");
+  const nested = gitPath(join(parent, ".agents", "worktrees", "child"));
+
+  let rows = runAudit(fixture).rows;
+  expect([rowFor(rows, parent)[3], rowFor(rows, parent)[7]]).toEqual(["clean", "safe"]);
+  expect([rowFor(rows, nested)[3], rowFor(rows, nested)[7]]).toEqual(["clean", "safe"]);
+
+  writeFileSync(join(parent, ".env"), "TOKEN=only-here\n");
+  rows = runAudit(fixture).rows;
+  expect([rowFor(rows, parent)[3], rowFor(rows, parent)[7]]).toEqual(["ignored:1", "hold-ignored"]);
+});
+
 test("a commit only the worktree's HEAD reflog reaches holds it, a rebased branch's old tip does not", () => {
   const fixture = createFixture();
   const detached = addWorktree(fixture, "detached", "--detach");
