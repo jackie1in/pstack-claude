@@ -591,8 +591,13 @@ export function dshModelNamesSection(models) {
   return (
     "DSH selects providers, models, and reasoning efforts through its current deployment. " +
     "Do not pass Claude Code model aliases to DSH or use the Pi/Copilot mapping merely because the parent model comes from that provider. " +
-    "Use `list_subagent_models` when exposed: first list providers, then models for a provider, then efforts for the exact provider/model pair. " +
-    "Without that tool, use the deployment's model settings or omit unsupported selectors. Pass `provider`, `model`, and " +
+    "Read the deployment catalog with `list_dsh_models`, which the pstack bundle registers: no arguments names providers, " +
+    "`provider` lists its advertised models, and `provider` + `model` lists that model's reasoning efforts. " +
+    "`list_subagent_models`, when present, answers the narrower question: the routes this Session authorizes for " +
+    "subagent selection. A Session records that authorization once, at creation, from the Host's model-selection " +
+    "setting; while the Host leaves selection off, the bundle records the deployment catalog itself, so a model " +
+    "the sheet names from `list_dsh_models` is selectable. " +
+    "Without either tool, use the deployment's model settings or omit unsupported selectors. Pass `provider`, `model`, and " +
     "`reasoning_effort` only when the live delegation schema accepts them; omit all selectors to use its documented defaults.\n\n" +
     `Roles used by ${roleSkills(models).map(code).join(", ")} are prompt responsibilities, not DSH model IDs or built-in agent types. ` +
     `Diverse-model panels (${panelSkills(models)}) require distinct available model families; report when that is unavailable. ` +
