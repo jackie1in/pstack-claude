@@ -43,7 +43,7 @@ export function candidates(projectsDir, maxDepth = 2, { includeCompressed = fals
   const walk = (dir, depth) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const full = join(dir, entry.name);
-      if (entry.isFile() && (entry.name.endsWith(".jsonl") || (includeCompressed && entry.name.endsWith(".jsonl.zst")))) files.push(full);
+      if (entry.isFile() && (entry.name.endsWith(".jsonl") || (includeCompressed && (entry.name.endsWith(".jsonl.zst") || entry.name.endsWith(".jsonl.zstd"))))) files.push(full);
       else if (entry.isDirectory() && depth < maxDepth) {
         try {
           walk(full, depth + 1);

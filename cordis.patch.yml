@@ -6,6 +6,13 @@
     - id: pstack-dsh
       name: './plugins/pstack/dsh/index.mjs'
 
+    # A checkout for one delegated writer, created through DSH's own worktree
+    # runtime and left outside the caller's directory. It activates only where
+    # that runtime is mounted, so the tool appears with Change requests &
+    # worktrees and stays absent without it.
+    - id: pstack-worktree
+      name: './plugins/pstack/dsh/worktree.mjs'
+
     # A pstack-flavored child composition: the role prompt, the file, shell,
     # skill, todo, web, question, job, and delegation tools, and compaction.
     # Selecting it as a session preset also lets the built-in `subagent` take

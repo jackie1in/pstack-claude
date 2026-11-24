@@ -15,6 +15,12 @@ import {
   readModelSheet,
   routingText,
 } from "../plugins/pstack/dsh/index.mjs";
+import {
+  apply as applyWorktreeTool,
+  inject as worktreeInject,
+  name as worktreeName,
+  TOOL as WORKTREE_TOOL,
+} from "../plugins/pstack/dsh/worktree.mjs";
 import { mappingCoverage } from "./mapping-coverage.mjs";
 
 const runtime = RUNTIMES.find((row) => row.name === "DeepSeek Harness");
@@ -222,7 +228,12 @@ test("routingText names unqualified DSH skills and the mapping", () => {
 
 test("the DSH package validator accepts the bundle and rejects broken packaging", () => {
   const manifest = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
-  const files = new Set(["cordis.patch.yml", "plugins/pstack/dsh/index.mjs", "plugins/pstack/skills/poteto-mode/SKILL.md"]);
+  const files = new Set([
+    "cordis.patch.yml",
+    "plugins/pstack/dsh/index.mjs",
+    "plugins/pstack/dsh/worktree.mjs",
+    "plugins/pstack/skills/poteto-mode/SKILL.md",
+  ]);
   const options = {
     pathExists: (rel) => files.has(rel),
     read: () => readFileSync(join(repoRoot, "cordis.patch.yml"), "utf8"),
@@ -238,6 +249,88 @@ test("the DSH package validator accepts the bundle and rejects broken packaging"
   expect(() => validateDshPackage(manifest, { ...options, pathExists: () => false })).toThrow(
     "names a file that does not exist",
   );
+  expect(() => validateDshPackage(manifest, {
+    ...options,
+    pathExists: (rel) => rel !== "plugins/pstack/dsh/worktree.mjs" && files.has(rel),
+  })).toThrow("DSH worktree plugin plugins/pstack/dsh/worktree.mjs is missing");
+});
+
+function worktreeHarness({ createError, restoreError } = {}) {
+  const tools = [];
+  const record = {
+    path: "/repo/.agents/worktrees/child",
+    branch: "child",
+    baseCommit: "a".repeat(40),
+    repositoryRoot: "/repo",
+  };
+  const state = { dir: "/repo" };
+  const setCalls = [];
+  const ctx = {
+    workingDirectory: {
+      get: () => state.dir,
+      set: async (_agent, path) => {
+        setCalls.push(path);
+        if (restoreError !== undefined) throw new Error(restoreError);
+        state.dir = path;
+        return path;
+      },
+    },
+    worktrees: {
+      create: async () => {
+        state.dir = record.path;
+        if (createError !== undefined) throw new Error(createError);
+        return record;
+      },
+    },
+    tools: { register: (tool) => { tools.push(tool); return () => {}; } },
+  };
+  return { ctx, tools, record, setCalls, state };
+}
+
+test("the worktree plugin mounts the delegate creation tool", () => {
+  expect(worktreeName).toBe("pstack-worktree");
+  expect(worktreeInject).toEqual(["tools", "worktrees", "workingDirectory"]);
+  const { ctx, tools } = worktreeHarness();
+  applyWorktreeTool(ctx);
+  expect(tools).toHaveLength(1);
+  const tool = tools[0];
+  expect(tool.name).toBe(WORKTREE_TOOL);
+  expect(tool.parameters.properties).toHaveProperty("name");
+  expect(tool.parameters.properties).toHaveProperty("from");
+  expect(tool.output.schema).toMatchObject({ type: "object", additionalProperties: false });
+  expect(tool.output.render({}, { path: "/p" })).toEqual([{ type: "text", text: JSON.stringify({ path: "/p" }) }]);
+  expect(tool.isConcurrencySafe()).toBe(false);
+});
+
+test("the delegate worktree tool restores the caller's directory", async () => {
+  const { ctx, tools, record, setCalls, state } = worktreeHarness();
+  applyWorktreeTool(ctx);
+  const result = await tools[0].execute({ name: "child" }, { agent: { session: {} } });
+  expect(result).toEqual(record);
+  expect(state.dir).toBe("/repo");
+  expect(setCalls).toEqual(["/repo"]);
+});
+
+test("a creation that moved the directory and then failed still restores it", async () => {
+  const { ctx, tools, setCalls, state } = worktreeHarness({ createError: "checkout failed" });
+  applyWorktreeTool(ctx);
+  await expect(tools[0].execute({}, { agent: { session: {} } })).rejects.toThrow("checkout failed");
+  expect(state.dir).toBe("/repo");
+  expect(setCalls).toEqual(["/repo"]);
+});
+
+test("a failed restore names the checkout the caller now sits in", async () => {
+  const { ctx, tools, record } = worktreeHarness({ restoreError: "directory locked" });
+  applyWorktreeTool(ctx);
+  await expect(tools[0].execute({}, { agent: { session: {} } })).rejects.toThrow(
+    `created worktree ${record.branch} at ${record.path}, but the caller's directory /repo could not be restored: directory locked`,
+  );
+});
+
+test("the delegate worktree tool requires a calling agent", async () => {
+  const { ctx, tools } = worktreeHarness();
+  applyWorktreeTool(ctx);
+  await expect(tools[0].execute({}, {})).rejects.toThrow("requires a calling agent");
 });
 
 test("DSH Model names are generated from configured roles and panels", () => {

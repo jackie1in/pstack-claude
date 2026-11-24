@@ -618,6 +618,7 @@ export function validateDshPackage(manifest, { read, pathExists }) {
   }
   if (!pathExists("cordis.patch.yml")) throw new Error(`${at}: dsh.bundle.patch names a file that does not exist`);
   if (!pathExists("plugins/pstack/dsh/index.mjs")) throw new Error(`${at}: DSH bundle plugin plugins/pstack/dsh/index.mjs is missing`);
+  if (!pathExists("plugins/pstack/dsh/worktree.mjs")) throw new Error(`${at}: DSH worktree plugin plugins/pstack/dsh/worktree.mjs is missing`);
   if (!pathExists("plugins/pstack/skills/poteto-mode/SKILL.md")) {
     throw new Error(`${at}: DSH bundle plugin reads plugins/pstack/skills, which is missing`);
   }
@@ -626,7 +627,7 @@ export function validateDshPackage(manifest, { read, pathExists }) {
     throw new Error(`${at}: engines.dsh must admit 0.2.2-rc.1`);
   }
   const patch = read("cordis.patch.yml");
-  for (const needle of ["id: pstack-dsh", "./plugins/pstack/dsh/index.mjs", "id: preset-pstack", "id: pstack-subagent"]) {
+  for (const needle of ["id: pstack-dsh", "./plugins/pstack/dsh/index.mjs", "id: pstack-worktree", "./plugins/pstack/dsh/worktree.mjs", "id: preset-pstack", "id: pstack-subagent"]) {
     if (!patch.includes(needle)) throw new Error(`cordis.patch.yml: missing ${needle}`);
   }
 }

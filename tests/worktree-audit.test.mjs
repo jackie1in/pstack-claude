@@ -13,7 +13,7 @@ import { audit, classify, defaultTranscriptRoots, duSize, lastChats, pathSpellin
 import { removeDuring } from "./remove-during.mjs";
 
 // Every runtime directory at its default under home, whatever this shell has set.
-const noEnv = { claudeConfigDir: "", codexHome: "", piAgentDir: "", copilotHome: "" };
+const noEnv = { claudeConfigDir: "", codexHome: "", piAgentDir: "", copilotHome: "", dshHome: "" };
 
 const script = join(import.meta.dir, "../plugins/pstack/skills/poteto-mode/scripts/worktree-audit.mjs");
 // node's ESM loader takes a file URL, not a drive-lettered path.
@@ -698,6 +698,13 @@ describe("default transcripts roots", () => {
     expect(roots({ claudeConfigDir: "/cc", exists })).toEqual(["/cc/projects"]);
   });
 
+  test("DeepSeek Harness's sessions, under DSH_HOME when set", () => {
+    const present = new Set([claude, "/dsh/sessions", "/home/u/.dsh/sessions"]);
+    const exists = (path) => present.has(path);
+    expect(roots({ dshHome: "/dsh", exists })).toEqual([claude, "/dsh/sessions"]);
+    expect(roots({ exists })).toEqual([claude, "/home/u/.dsh/sessions"]);
+  });
+
   test("Copilot's session-state, under COPILOT_HOME when set", () => {
     const present = new Set([claude, "/cp/session-state", "/home/u/.copilot/session-state"]);
     const exists = (path) => present.has(path);
@@ -962,7 +969,7 @@ test.each([
   expect(duSize(output)).toBe(expected);
 });
 
-describe("compressed Codex rollouts", () => {
+describe("compressed session logs", () => {
   const jsonl = (cwd) => `${JSON.stringify({ type: "session_meta", payload: { cwd } })}\n`;
   const packed = (cwd) => zlib.zstdCompressSync(Buffer.from(jsonl(cwd)));
   const scan = (fixture, path) => lastChats([fixture.transcripts], new Map([[path, [path]]]));
@@ -990,10 +997,11 @@ describe("compressed Codex rollouts", () => {
     const fixture = createFixture();
     const plain = writePacked(fixture, "plain.jsonl", jsonl("/x"));
     const compressed = writePacked(fixture, "2026/11/07/rollout.jsonl.zst", packed("/x"));
+    const harness = writePacked(fixture, "2026/11/07/session.v4.jsonl.zstd", packed("/x"));
     writePacked(fixture, "other.gz", "");
     expect(candidates(fixture.transcripts).map(({ path }) => path)).toEqual([plain]);
     expect(candidates(fixture.transcripts, 2, { includeCompressed: true }).map(({ path }) => path)).toEqual([plain]);
-    expect(candidates(fixture.transcripts, Infinity, { includeCompressed: true }).map(({ path }) => path).sort()).toEqual([plain, compressed].sort());
+    expect(candidates(fixture.transcripts, Infinity, { includeCompressed: true }).map(({ path }) => path).sort()).toEqual([plain, compressed, harness].sort());
   });
 
   test.skipIf(!canDecode)("a compressed rollout retains Unicode paths and its timestamp", () => {
@@ -1012,6 +1020,13 @@ describe("compressed Codex rollouts", () => {
     utimesSync(plain, 100, compressedNewer ? 100 : 200);
     utimesSync(compressed, 100, compressedNewer ? 200 : 100);
     expect(scan(fixture, path).get(path)).toBe(200);
+  });
+
+  test.skipIf(!canDecode)("a DeepSeek Harness .jsonl.zstd log is scanned frame by frame", () => {
+    const fixture = createFixture();
+    const path = "/workspace/harness";
+    writePacked(fixture, "2026/session.v4.jsonl.zstd", Buffer.concat([packed("/workspace/other"), packed(path)]));
+    expect(scan(fixture, path).has(path)).toBe(true);
   });
 
   test.skipIf(!canDecode)("every concatenated frame is scanned, without matching sibling prefixes", () => {
